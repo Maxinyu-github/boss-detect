@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  boss-detect:
+    build: .
+    container_name: boss-detect
+    network_mode: host
+    # 需要网络权限来扫描局域网
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    privileged: true
+    volumes:
+      # 挂载配置文件
+      - ./config.ini:/app/config.ini:ro
+      # 挂载日志目录
+      - ./logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai

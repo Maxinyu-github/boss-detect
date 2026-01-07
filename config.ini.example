@@ -1,0 +1,27 @@
+[network]
+# 老板手机的MAC地址 (格式: aa:bb:cc:dd:ee:ff)
+boss_mac = 00:11:22:33:44:55
+# 老板手机的IP地址 (可选，如果不知道可以留空)
+boss_ip = 192.168.1.100
+# 扫描间隔(秒)
+scan_interval = 30
+# 网络接口 (可选，留空则自动检测)
+network_interface = 
+
+[notification]
+# 通知服务类型 (pushdeer, webhook)
+service_type = pushdeer
+# PushDeer推送Key (从 https://www.pushdeer.com 获取)
+pushdeer_key = 
+# 自定义Webhook URL (如果使用webhook)
+webhook_url = 
+# 通知标题
+notification_title = 🚨 老板来了！
+# 通知内容
+notification_message = 检测到老板的手机已连接到局域网，请注意！
+
+[advanced]
+# 连续检测次数确认 (避免误报)
+confirmation_count = 2
+# 通知冷却时间(秒) - 避免重复通知
+notification_cooldown = 300
