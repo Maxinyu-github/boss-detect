@@ -147,8 +147,6 @@ def create_notification_service(service_type, **kwargs):
 
 if __name__ == "__main__":
     # 测试代码
-    import time
-    
     # 测试PushDeer (需要实际的pushkey)
     # service = PushDeerNotification("your_pushkey_here")
     # service.send("测试通知", "这是一条测试消息")
