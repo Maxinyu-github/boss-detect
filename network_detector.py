@@ -133,10 +133,13 @@ class NetworkDetector:
             
             if result.returncode == 0:
                 output = result.stdout.lower()
-                target_mac_normalized = target_mac.replace(':', '-')  # Windows使用-分隔符
+                # 标准化目标MAC地址，同时支持:和-两种格式
+                target_mac_colon = target_mac.replace('-', ':')
+                target_mac_dash = target_mac.replace(':', '-')
                 
                 for line in output.split('\n'):
-                    if target_mac in line or target_mac_normalized in line:
+                    # 检查是否包含目标MAC（任一格式）
+                    if target_mac_colon in line or target_mac_dash in line:
                         # 尝试提取IP地址
                         parts = line.split()
                         for part in parts:
