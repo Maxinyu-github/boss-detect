@@ -4,8 +4,11 @@
 """
 import time
 import logging
-from scapy.all import ARP, Ether, srp
+from scapy.all import ARP, Ether, srp, ICMP, IP, sr1
 import socket
+import subprocess
+import platform
+import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -64,9 +67,99 @@ class NetworkDetector:
             logger.error(f"网络扫描失败: {e}")
             return []
     
+    def _ping_host(self, ip):
+        """
+        使用ICMP ping检测主机是否在线
+        
+        Args:
+            ip: 目标IP地址
+            
+        Returns:
+            bool: 是否在线
+        """
+        try:
+            # 首先尝试使用scapy发送ICMP包（更可靠）
+            packet = IP(dst=ip)/ICMP()
+            response = sr1(packet, timeout=2, verbose=0)
+            if response:
+                logger.debug(f"ICMP ping成功: {ip}")
+                return True
+        except Exception as e:
+            logger.debug(f"Scapy ICMP ping失败: {e}")
+        
+        # 如果scapy失败，尝试使用系统ping命令作为备选
+        try:
+            # 根据操作系统选择ping命令参数
+            param = '-n' if platform.system().lower() == 'windows' else '-c'
+            count = '1'
+            # 在Linux/Mac上使用-W/-w设置超时
+            if platform.system().lower() != 'windows':
+                command = ['ping', param, count, '-W', '2', ip]
+            else:
+                command = ['ping', param, count, '-w', '2000', ip]
+            
+            # 执行ping命令，禁止输出
+            result = subprocess.run(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"系统ping成功: {ip}")
+                return True
+        except Exception as e:
+            logger.debug(f"系统ping失败: {e}")
+        
+        return False
+    
+    def _check_arp_cache(self, target_mac):
+        """
+        检查系统ARP缓存中是否有目标MAC地址
+        
+        Args:
+            target_mac: 目标MAC地址
+            
+        Returns:
+            tuple: (bool, str) - (是否找到, IP地址)
+        """
+        try:
+            # 根据操作系统选择ARP命令
+            if platform.system().lower() == 'windows':
+                result = subprocess.run(['arp', '-a'], capture_output=True, text=True, timeout=5)
+            else:
+                result = subprocess.run(['arp', '-n'], capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0:
+                output = result.stdout.lower()
+                # 标准化目标MAC地址，同时支持:和-两种格式
+                target_mac_colon = target_mac.replace('-', ':')
+                target_mac_dash = target_mac.replace(':', '-')
+                
+                for line in output.split('\n'):
+                    # 检查是否包含目标MAC（任一格式）
+                    if target_mac_colon in line or target_mac_dash in line:
+                        # 尝试提取IP地址
+                        parts = line.split()
+                        for part in parts:
+                            # 检查是否是IP地址格式
+                            if '.' in part and len(part.split('.')) == 4:
+                                try:
+                                    # 验证是否为有效IP
+                                    socket.inet_aton(part)
+                                    logger.info(f"在ARP缓存中发现目标设备: IP={part}, MAC={target_mac}")
+                                    return True, part
+                                except socket.error:
+                                    continue
+        except Exception as e:
+            logger.debug(f"检查ARP缓存失败: {e}")
+        
+        return False, None
+    
     def is_target_online(self, ip_range=None):
         """
-        检测目标设备是否在线
+        检测目标设备是否在线（使用多种方法）
         
         Args:
             ip_range: IP地址范围
@@ -74,18 +167,48 @@ class NetworkDetector:
         Returns:
             tuple: (bool, str) - (是否在线, IP地址)
         """
+        # 方法1: 如果知道目标IP，先尝试ping
+        if self.target_ip:
+            logger.debug(f"尝试ping目标IP: {self.target_ip}")
+            if self._ping_host(self.target_ip):
+                logger.info(f"通过ping发现目标设备在线: {self.target_ip}")
+                # ping成功后，验证MAC地址（通过ARP缓存或新的ARP请求）
+                found, ip = self._check_arp_cache(self.target_mac)
+                if found and ip == self.target_ip:
+                    return True, self.target_ip
+                # 如果缓存中没有，发送ARP请求获取MAC
+                devices = self.scan_network(f"{self.target_ip}/32")
+                for ip, mac in devices:
+                    if mac.lower() == self.target_mac and ip == self.target_ip:
+                        logger.info(f"Ping+ARP验证成功: {ip}")
+                        return True, self.target_ip
+        
+        # 方法2: 检查ARP缓存（适用于已连接但不活跃的设备）
+        logger.debug("检查ARP缓存...")
+        found, ip = self._check_arp_cache(self.target_mac)
+        if found:
+            # 如果在缓存中找到，尝试ping验证设备是否真的在线
+            if self._ping_host(ip):
+                logger.info(f"通过ARP缓存+ping验证设备在线: {ip}")
+                return True, ip
+            else:
+                logger.debug(f"ARP缓存中找到设备但ping失败，可能已离线")
+        
+        # 方法3: ARP扫描网络（主动发现）
+        logger.debug("执行ARP网络扫描...")
         devices = self.scan_network(ip_range)
         
         for ip, mac in devices:
             mac = mac.lower()
             if mac == self.target_mac:
-                logger.info(f"发现目标设备! IP: {ip}, MAC: {mac}")
+                logger.info(f"通过ARP扫描发现目标设备! IP: {ip}, MAC: {mac}")
                 return True, ip
             # 如果指定了IP地址，也检查IP
             if self.target_ip and ip == self.target_ip:
                 logger.info(f"通过IP地址发现目标设备! IP: {ip}, MAC: {mac}")
                 return True, ip
         
+        logger.debug("所有检测方法均未发现目标设备")
         return False, None
     
     def _get_local_network_range(self):
