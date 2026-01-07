@@ -5,6 +5,7 @@
 import logging
 import requests
 import json
+import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

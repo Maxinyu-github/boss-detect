@@ -200,9 +200,13 @@ def main():
     """)
     
     # 检查是否以root/管理员权限运行
-    if os.name != 'nt' and os.geteuid() != 0:
-        logger.warning("警告: 建议以root权限运行以获得更好的网络扫描效果")
-        logger.warning("使用命令: sudo python3 boss_detect.py")
+    if os.name != 'nt' and hasattr(os, 'geteuid'):
+        try:
+            if os.geteuid() != 0:
+                logger.warning("警告: 建议以root权限运行以获得更好的网络扫描效果")
+                logger.warning("使用命令: sudo python3 boss_detect.py")
+        except (AttributeError, OSError):
+            pass  # 某些系统可能不支持geteuid
     
     detector = BossDetector()
     detector.run()
