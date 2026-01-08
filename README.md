@@ -8,6 +8,7 @@
 - ✅ **MAC地址匹配**: 精确识别目标设备的MAC地址
 - ✅ **多种通知方式**: 支持PushDeer、自定义Webhook等
 - ✅ **智能防抖**: 支持确认检测和通知冷却时间，避免误报和重复通知
+- ✅ **到达和离开通知**: 检测老板到达和离开时都会发送通知
 - ✅ **Docker支持**: 提供Docker和Docker Compose部署方式
 - ✅ **跨平台**: 支持Windows、Linux等平台
 
@@ -91,8 +92,10 @@ python boss_detect.py
 | `service_type` | 通知服务类型 | `pushdeer` 或 `webhook` |
 | `pushdeer_key` | PushDeer推送Key | 从官网获取 |
 | `webhook_url` | 自定义Webhook URL | `https://your-webhook.com/api` |
-| `notification_title` | 通知标题 | `🚨 老板来了！` |
-| `notification_message` | 通知内容 | 自定义消息 |
+| `notification_title` | 到达通知标题 | `🚨 老板来了！` |
+| `notification_message` | 到达通知内容 | 自定义消息 |
+| `leave_notification_title` | 离开通知标题 | `✅ 老板离开了！` |
+| `leave_notification_message` | 离开通知内容 | 自定义消息 |
 
 ### 高级配置 `[advanced]`
 
@@ -201,8 +204,9 @@ docker stop boss-detect
    - **ARP网络扫描**: 广播ARP请求扫描整个局域网段
 2. **MAC地址匹配**: 将检测结果与配置的目标MAC地址进行比对
 3. **确认检测**: 连续检测N次（默认2次）确认设备在线，避免误报
-4. **发送通知**: 通过PushDeer或Webhook发送通知消息
-5. **冷却机制**: 在冷却时间内（默认5分钟）不重复发送通知
+4. **发送到达通知**: 当确认老板在线时，通过PushDeer或Webhook发送到达通知
+5. **发送离开通知**: 当检测到老板离线时，发送离开通知
+6. **冷却机制**: 在冷却时间内（默认5分钟）不重复发送通知
 
 ### 检测策略详解
 
