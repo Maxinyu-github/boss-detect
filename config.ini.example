@@ -19,6 +19,10 @@ webhook_url =
 notification_title = 🚨 老板来了！
 # 通知内容
 notification_message = 检测到老板的手机已连接到局域网，请注意！
+# 离开通知标题
+leave_notification_title = ✅ 老板离开了！
+# 离开通知内容
+leave_notification_message = 老板的手机已从局域网断开，可以放松了~
 
 [advanced]
 # 连续检测次数确认 (避免误报)

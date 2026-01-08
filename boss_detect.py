@@ -42,6 +42,7 @@ class BossDetector:
         self.boss_online = False
         self.last_notification_time = None
         self.detection_count = 0
+        self.last_known_ip = None  # 记录最后已知的IP地址
         
         logger.info("Boss Detector 初始化完成")
     
@@ -115,22 +116,27 @@ class BossDetector:
         
         return time_since_last.total_seconds() > cooldown
     
-    def _send_notification(self, ip):
+    def _send_notification(self, ip, is_arrival=True):
         """
         发送通知
         
         Args:
             ip: 检测到的IP地址
+            is_arrival: True表示到达通知，False表示离开通知
         """
         if not self._should_send_notification():
             logger.info("通知在冷却期内，跳过发送")
             return
         
-        title = self.config.get('notification', 'notification_title')
-        message = self.config.get('notification', 'notification_message')
+        if is_arrival:
+            title = self.config.get('notification', 'notification_title')
+            message = self.config.get('notification', 'notification_message')
+        else:
+            title = self.config.get('notification', 'leave_notification_title', fallback='✅ 老板离开了！')
+            message = self.config.get('notification', 'leave_notification_message', fallback='老板的手机已从局域网断开，可以放松了~')
         
         # 添加详细信息
-        detail = f"\n\n**检测信息:**\n- 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n- IP地址: {ip}\n- MAC地址: {self.config.get('network', 'boss_mac')}"
+        detail = f"\n\n**检测信息:**\n- 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n- IP地址: {ip if ip else '未知'}\n- MAC地址: {self.config.get('network', 'boss_mac')}"
         full_message = message + detail
         
         success = self.notification_service.send(title, full_message)
@@ -166,16 +172,21 @@ class BossDetector:
                             # 确认在线
                             logger.warning("🚨 确认老板在线！")
                             self.boss_online = True
+                            self.last_known_ip = ip
                             self.detection_count = 0
-                            self._send_notification(ip)
+                            self._send_notification(ip, is_arrival=True)
                     else:
-                        # 持续在线
+                        # 持续在线，更新最后已知IP
+                        if ip:
+                            self.last_known_ip = ip
                         logger.debug("老板仍在线")
                 else:
                     if self.boss_online:
                         # 从在线变为离线
                         logger.info("✅ 老板已离线")
                         self.boss_online = False
+                        self._send_notification(self.last_known_ip, is_arrival=False)
+                        self.last_known_ip = None
                     
                     # 重置检测计数
                     self.detection_count = 0
