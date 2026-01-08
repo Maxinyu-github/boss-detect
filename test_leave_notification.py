@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
 测试离开通知功能
+Test leave notification functionality
 """
 import sys
 import os
 import configparser
+import tempfile
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
@@ -42,11 +44,9 @@ def test_leave_notification_config():
 def test_send_notification_with_type():
     """测试_send_notification方法支持到达和离开通知"""
     print("\n测试发送通知功能（到达/离开）...")
-    try:
-        from boss_detect import BossDetector
-        
-        # 创建临时配置文件
-        config_content = """[network]
+    
+    # 创建临时配置文件
+    config_content = """[network]
 boss_mac = aa:bb:cc:dd:ee:ff
 boss_ip = 192.168.1.100
 scan_interval = 30
@@ -64,8 +64,14 @@ leave_notification_message = 老板离线
 confirmation_count = 2
 notification_cooldown = 300
 """
-        with open('/tmp/test_config.ini', 'w', encoding='utf-8') as f:
-            f.write(config_content)
+    
+    # 使用临时文件
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False, encoding='utf-8') as f:
+        config_file = f.name
+        f.write(config_content)
+    
+    try:
+        from boss_detect import BossDetector
         
         # Mock网络检测器和通知服务
         with patch('boss_detect.NetworkDetector'), \
@@ -76,7 +82,7 @@ notification_cooldown = 300
             mock_service.send = Mock(return_value=True)
             mock_notif.return_value = mock_service
             
-            detector = BossDetector('/tmp/test_config.ini')
+            detector = BossDetector(config_file)
             
             # 测试到达通知
             detector._send_notification('192.168.1.100', is_arrival=True)
@@ -107,17 +113,15 @@ notification_cooldown = 300
         return False
     finally:
         # 清理临时文件
-        if os.path.exists('/tmp/test_config.ini'):
-            os.remove('/tmp/test_config.ini')
+        if os.path.exists(config_file):
+            os.remove(config_file)
 
 def test_leave_notification_triggered():
     """测试离开通知是否在正确的时机触发"""
     print("\n测试离开通知触发时机...")
-    try:
-        from boss_detect import BossDetector
-        
-        # 创建临时配置文件
-        config_content = """[network]
+    
+    # 创建临时配置文件
+    config_content = """[network]
 boss_mac = aa:bb:cc:dd:ee:ff
 boss_ip = 192.168.1.100
 scan_interval = 30
@@ -135,8 +139,14 @@ leave_notification_message = 老板离线
 confirmation_count = 1
 notification_cooldown = 0
 """
-        with open('/tmp/test_config2.ini', 'w', encoding='utf-8') as f:
-            f.write(config_content)
+    
+    # 使用临时文件
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False, encoding='utf-8') as f:
+        config_file = f.name
+        f.write(config_content)
+    
+    try:
+        from boss_detect import BossDetector
         
         # Mock网络检测器和通知服务
         with patch('boss_detect.NetworkDetector') as mock_detector_class, \
@@ -150,7 +160,7 @@ notification_cooldown = 0
             mock_detector = Mock()
             mock_detector_class.return_value = mock_detector
             
-            detector = BossDetector('/tmp/test_config2.ini')
+            detector = BossDetector(config_file)
             
             # 模拟场景：老板从离线到在线
             print("  场景1: 老板上线...")
@@ -198,8 +208,8 @@ notification_cooldown = 0
         return False
     finally:
         # 清理临时文件
-        if os.path.exists('/tmp/test_config2.ini'):
-            os.remove('/tmp/test_config2.ini')
+        if os.path.exists(config_file):
+            os.remove(config_file)
 
 def main():
     """运行所有测试"""
